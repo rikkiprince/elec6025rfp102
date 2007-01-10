@@ -23,7 +23,9 @@ GLuint img;
 GLenum status;
 GLuint render_texture;
 
-int rttWidth = 512, rttHeight = 512;
+int rttWidth = 1024, rttHeight = 1024;
+
+int winWidth, winHeight;
 
 DSterrain terrain;
 
@@ -90,14 +92,14 @@ void renderCloud(Cloud c)
 	int blob=0;
 	CloudBlob prevBlob = c.cloud[0];
 
-	printf("Rendering cloud...\n");
+	//printf("Rendering cloud...\n");
 
 	glPushMatrix();
 	glTranslatef(prevBlob.pos.i, prevBlob.pos.j, prevBlob.pos.k);
 
 	for(blob=0; blob<c.arrsize; blob++)
 	{
-		printf("blob at: (%f, %f, %f)\n", c.cloud[blob].pos.i, c.cloud[blob].pos.j, c.cloud[blob].pos.k);
+		//printf("blob at: (%f, %f, %f)\n", c.cloud[blob].pos.i, c.cloud[blob].pos.j, c.cloud[blob].pos.k);
 		glTranslatef(c.cloud[blob].pos.i - prevBlob.pos.i, c.cloud[blob].pos.j - prevBlob.pos.j, c.cloud[blob].pos.k - prevBlob.pos.k);
 		glutSolidSphere(c.cloud[blob].size, c.a, c.b);
 		prevBlob = c.cloud[blob];
@@ -239,8 +241,40 @@ void lineBasedOutline(void (*geom)(void))
 	glPopAttrib();
 }
 
+// http://nehe.gamedev.net/data/lessons/lesson.asp?lesson=36
+void ViewOrtho()							// Set Up An Ortho View
+{
+	glMatrixMode(GL_PROJECTION);					// Select Projection
+	glPushMatrix();							// Push The Matrix
+	glLoadIdentity();						// Reset The Matrix
+	glOrtho( 0, 640 , 480 , 0, -1, 1 );				// Select Ortho Mode (640x480)
+	glMatrixMode(GL_MODELVIEW);					// Select Modelview Matrix
+	glPushMatrix();							// Push The Matrix
+	glLoadIdentity();						// Reset The Matrix
+}
+
+void ViewPerspective()							// Set Up A Perspective View
+{
+	glMatrixMode( GL_PROJECTION );					// Select Projection
+	glPopMatrix();							// Pop The Matrix
+	glMatrixMode( GL_MODELVIEW );					// Select Modelview
+	glPopMatrix();							// Pop The Matrix
+}
+
+int nextPowerOf2(int n)
+{
+	// http://groups.google.co.uk/group/sci.math/browse_thread/thread/3d1f5af967d981c/6a665f4a4c8edb3a?hide_quotes=no#msg_5ea5f7fdcfdace1b
+	int i = 0;
+	while(pow(2, i) <= n) i++;
+
+	return pow(2, i);
+}
+
 void display(void)
 {
+	float w = winWidth, h = winHeight;
+	GLfloat qs = 0.45;
+
 	// RTT
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
 	glPushAttrib(GL_VIEWPORT_BIT);
@@ -273,28 +307,42 @@ void display(void)
 	glPopAttrib();
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
-
+	
+	//glMatrixMode(GL_PROJECTION);	// set projection mode
+	glPushMatrix();
+	glLoadIdentity();
+	gluOrtho2D(-1.0f, 1.0f, -1.0f, 1.0f);
+	gluLookAt(	0.0f, 0.0f, 0.0f, 
+				0.0f,  0.0f,  -1.0f,
+				0.0f,  1.0,  0.0f);
+	//printf("w: %f h: %f\n", w, h);
+	//gluOrtho2D(-1.0f, 1.0f, -w/h, w/h);
 	
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	// clear frame and z-buffers
 	//glLoadIdentity();									// load identity matrix
-
 
 	useShader(&minimal);
 	glColor3f(1.0, 1.0, 1.0);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, img);
-	glScalef(5.0, 5.0, 1.0);
+	//glScalef(5.0, 5.0, 1.0);
 	glBegin(GL_QUADS);
 		glTexCoord2f(0.0, 0.0);
-		glVertex3f(0.0, 0.0, 1.0);
+		glVertex3f(-qs*w/h, -qs, 1.0);
+
 		glTexCoord2f(1.0, 0.0);
-		glVertex3f(1.0, 0.0, 1.0);
+		glVertex3f( qs*w/h, -qs, 1.0);
+
 		glTexCoord2f(1.0, 1.0);
-		glVertex3f(1.0, 1.0, 1.0);
+		glVertex3f( qs*w/h,  qs, 1.0);
+
 		glTexCoord2f(0.0, 1.0);
-		glVertex3f(0.0, 1.0, 1.0);
+		glVertex3f(-qs*w/h,  qs, 1.0);
 	glEnd();
 	glDisable(GL_TEXTURE_2D);
+
+	glPopMatrix();
+	//glMatrixMode(GL_MODELVIEW);
 
 /*	useShader(&toon);
 	glutSolidTeapot(1);
@@ -451,6 +499,8 @@ void idle(void)
 void reshape(int w, int h)
 {
 	//GLfloat nw, nh;
+	winWidth = w;
+	winHeight = h;
 
 	glViewport(0, 0, w, h);			// set up viewport based on width and height
 	glMatrixMode(GL_PROJECTION);	// set projection mode
