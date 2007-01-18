@@ -22,6 +22,8 @@ GLshader depthnormal;
 GLshader discontinuity;
 GLshader textureSimple;
 GLshader depthoutline;
+GLshader normaloutline;
+GLshader final;
 
 GLuint fbo;
 GLuint depthbuffer;
@@ -41,12 +43,33 @@ int frameCount = 0;
 double idleCount = 0;
 
 
+
+
+
+
+#define LONGITUDINALS	(36)
+#define LATITUDINALS	(36)							// breaks above 72 - possibly due to angle calculation?
+#define TOTAL			(LONGITUDINALS * LATITUDINALS)
+
+//GLvertex ind[TOTAL];
+//GLnormal norm[TOTAL];
+GLquad quads[TOTAL];
+int q=0;	// quad count
+
+int generateQuads(GLfloat r, int longs, int lats, GLquad quads[]);
+void drawQuads(int q, GLquad quads[]);
+
+
+
+
+
+
+
 void drawToonGeometry(void);
 void plainToonShader(void (*geom)(void), GLshader *shader);
 void renderWithShader(void (*geom)(void), GLshader *shader);
 void lineBasedOutline(void (*geom)(void), GLshader *shader);
 
-int whichToonRenderer = 6;
 
 typedef struct
 {
@@ -55,13 +78,16 @@ typedef struct
 	GLshader *postshader;
 } Renderer;
 
-#define MAX_RENDERERS	(6)
+#define MAX_RENDERERS	(8)
+int whichToonRenderer = 7;
 
 Renderer renderer[MAX_RENDERERS] = {	{&plainToonShader,	&toon,			&minimal},
 										{&lineBasedOutline,	&minimal,		&minimal},
 										{&renderWithShader,	&depthshader,	&minimal},
 										{&renderWithShader,	&normalshader,	&minimal},
 										{&renderWithShader,	&depthnormal,	&depthoutline},
+										{&renderWithShader,	&depthnormal,	&normaloutline},
+										{&renderWithShader,	&depthnormal,	&final},
 										{&renderWithShader,	&depthnormal,	&textureSimple},
 									};
 
@@ -230,7 +256,8 @@ void drawToonGeometry(void)
 {
 	// sky dome
 	glColor3f(114.0/255.0, 181.0/255.0, 245.0/255.0);
-	glutSolidSphere(100, 10, 10);
+	//glutSolidSphere(100, 10, 10);
+	drawQuads(q, quads);
 
 	// set groud colour
 	glColor3f(1.0f, 0.5f, 0.5f);
@@ -238,6 +265,7 @@ void drawToonGeometry(void)
 	drawDSTerrain(&terrain);
 
 	drawClouds();
+	//glutSolidCube(1.0f);
 }
 
 void plainToonShader(void (*geom)(void), GLshader *shader)
@@ -336,7 +364,7 @@ void display(void)
 	glutSolidSphere(100, 10, 10);*/
 
 	useShader(&minimal);
-	drawAxes(10);
+	//drawAxes(10);
 
 /*	switch(whichToonRenderer)
 	{
@@ -513,6 +541,8 @@ void initRenderToTexture()
 
 void initialisation()
 {
+	int longs=LONGITUDINALS, lats=LATITUDINALS;
+
 	// initialise position of camera.
 	defaultCamera(&camera);
 	levelHead(&camera);
@@ -528,10 +558,18 @@ void initialisation()
 	createShader(&discontinuity, "discontinuity.vert", "discontinuity.frag");
 	createShader(&textureSimple, "textureSimple.vert", "textureSimple.frag");
 	createShader(&depthoutline, "textureSimple.vert", "depthoutline.frag");
+	createShader(&normaloutline, "textureSimple.vert", "maybenormaloutline.frag");
+	createShader(&final, "textureSimple.vert", "final.frag");
 
 	createDSTerrain(&terrain, 6);
 	//printDSTerrain(&terrain);
 	//destroyDSTerrain(&terrain);
+
+	// 1. generate and draw quads
+	q = generateQuads(100.0, longs, lats, quads);
+
+
+
 
 	createCloud(&cloud, 30, 10, 10, 6);
 
@@ -681,4 +719,118 @@ void drawAxes(GLfloat l)
 		glVertex3f(0.0, 0.0, l);
 
 	glEnd();
+}
+
+
+
+
+
+
+
+
+
+
+
+void drawQuads(int q, GLquad quads[])
+{
+	GLrgb col = {1.0, 0.0, 0.0};
+
+	int k=0;
+
+
+	// draw quads
+	for(k=0; k<q; k++)
+	{
+		glBegin(GL_QUADS);
+			glVertex3fv((GLfloat *)&quads[k].tr);
+			glVertex3fv((GLfloat *)&quads[k].tl);
+			glVertex3fv((GLfloat *)&quads[k].bl);
+			glVertex3fv((GLfloat *)&quads[k].br);
+		glEnd();
+	}
+}
+
+
+void setPoints(GLfloat r, GLfloat th, GLfloat ph, GLfloat *x, GLfloat *y, GLfloat *z)
+{
+	GLfloat H;
+
+	*y = r * sin(DEG2RAD(ph));
+	H = r * cos(DEG2RAD(ph));
+
+	*z = H * sin(DEG2RAD(th));
+	*x = H * cos(DEG2RAD(th));
+}
+
+
+void setPointsV(GLfloat r, GLfloat th, GLfloat ph, GLvertex *v)
+{
+	setPoints(r, th, ph, &v->x, &v->y, &v->z);
+}
+
+void sphereNormal(GLvertex *v)
+{
+	GLvector t;
+	GLvertex c = {0.0, 0.0, 0.0};
+	
+	vertexSubtract(&t, *v, c);
+	//vertexSubtract(&t, c, *v);	// make them point inwards?
+	vectorNormalize(&t);
+
+	v->n = t;
+}
+
+// generate quads into quads[][]
+// lots of redundant info
+int generateQuads(GLfloat r, int longs, int lats, GLquad quads[])
+{
+	//GLfloat x, y, z, H;	// x, y, z and temp H variables
+	GLfloat th=0, ph=0;		// theta and phi angles
+
+	GLfloat dth=0, dph=0;		// delta for theta and phi angles
+	int i=0, j=0;				// loop variables
+
+	int q=0;
+
+	dth = 360/longs;
+	dph = 360/lats;
+
+	for(j=0, ph=90; j<lats/2+1; j++, ph+=dph)
+	{
+		for(i=0, th=0; i<longs; i++, th+=dth)
+		{
+			setPointsV(r, th,		ph,		&quads[q].tr);
+			setPointsV(r, th+dth,	ph,		&quads[q].tl);
+			setPointsV(r, th+dth,	ph+dph,	&quads[q].bl);
+			setPointsV(r, th,		ph+dph,	&quads[q].br);
+
+			//calculateQuadNormal(&quads[q]);
+
+			/*if(i>0 && j>0)
+			{
+				GLquad m=quads[q-longs-1];
+				GLquad n=quads[q-longs];
+				GLquad o=quads[q-1];
+				GLquad p=quads[q];
+
+				GLnormal norm;
+
+				norm.i = m.n.i + n.n.i + o.n.i + p.n.i;
+				norm.j = m.n.j + n.n.j + o.n.j + p.n.j;
+				norm.k = m.n.k + n.n.k + o.n.k + p.n.k;
+
+				vectorNormalize(&norm);
+
+				quads[q].tl.n = norm;
+			}*/
+			sphereNormal(&quads[q].tr);
+			sphereNormal(&quads[q].tl);
+			sphereNormal(&quads[q].bl);
+			sphereNormal(&quads[q].br);
+
+			q++;
+		}
+	}
+
+	return q;
 }

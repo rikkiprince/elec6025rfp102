@@ -90,6 +90,8 @@ void useShader(GLshader *s)
 	glUseProgram(s->p);
 }
 
+
+// http://www.lighthouse3d.com/opengl/glsl/index.php?oglinfo
 void printShaderInfoLog(GLuint obj)
 {
 	int infologLength = 0;
@@ -107,6 +109,7 @@ void printShaderInfoLog(GLuint obj)
 	}
 }
 
+// http://www.lighthouse3d.com/opengl/glsl/index.php?oglinfo
 void printProgramInfoLog(GLuint obj)
 {
 	int infologLength = 0;

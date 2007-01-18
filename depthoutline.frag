@@ -34,5 +34,7 @@ void main()
 	float G = sqrt(Gx*Gx+Gy*Gy);
 
 	vec4 newcolor = vec4(G, G, G, 1.0);
+	if(G > 0.1)	newcolor = vec4(0.0, 0.0, 0.0, 1.0);
+	else		newcolor = vec4(1.0, 1.0, 1.0, 1.0);
 	gl_FragColor = newcolor;
 }
