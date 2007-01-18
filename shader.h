@@ -16,3 +16,5 @@ typedef struct
 
 void createShader(GLshader *s, char *vert, char *frag);
 void useShader(GLshader *s);
+void printShaderInfoLog(GLuint obj);
+void printProgramInfoLog(GLuint obj);

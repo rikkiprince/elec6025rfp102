@@ -21,6 +21,7 @@ GLshader depthshader;
 GLshader depthnormal;
 GLshader discontinuity;
 GLshader textureSimple;
+GLshader depthoutline;
 
 GLuint fbo;
 GLuint depthbuffer;
@@ -39,7 +40,30 @@ int prevMillis;
 int frameCount = 0;
 double idleCount = 0;
 
-int whichToonRenderer = 5;
+
+void drawToonGeometry(void);
+void plainToonShader(void (*geom)(void), GLshader *shader);
+void renderWithShader(void (*geom)(void), GLshader *shader);
+void lineBasedOutline(void (*geom)(void), GLshader *shader);
+
+int whichToonRenderer = 6;
+
+typedef struct
+{
+	void (*render)(void (*geom)(void), GLshader *shader);
+	GLshader *preshader;
+	GLshader *postshader;
+} Renderer;
+
+#define MAX_RENDERERS	(6)
+
+Renderer renderer[MAX_RENDERERS] = {	{&plainToonShader,	&toon,			&minimal},
+										{&lineBasedOutline,	&minimal,		&minimal},
+										{&renderWithShader,	&depthshader,	&minimal},
+										{&renderWithShader,	&normalshader,	&minimal},
+										{&renderWithShader,	&depthnormal,	&depthoutline},
+										{&renderWithShader,	&depthnormal,	&textureSimple},
+									};
 
 typedef struct
 {
@@ -216,7 +240,7 @@ void drawToonGeometry(void)
 	drawClouds();
 }
 
-void plainToonShader(void (*geom)(void))
+void plainToonShader(void (*geom)(void), GLshader *shader)
 {
 	useShader(&toon);
 	(*geom)();
@@ -228,7 +252,7 @@ void renderWithShader(void (*geom)(void), GLshader *shader)
 	(*geom)();
 }
 
-void lineBasedOutline(void (*geom)(void))
+void lineBasedOutline(void (*geom)(void), GLshader *shader)
 {
 	glColor3f(0.0f, 0.0f, 0.0f);
 	// http://www.codeproject.com/opengl/dsaqua.asp
@@ -301,6 +325,7 @@ void display(void)
 	// Render as normal here
 	// output goes to the FBO and it’s attached buffers
 
+	//glClearColor(1.0, 1.0, 1.0, 0.0);		// has no effect
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	// clear frame and z-buffers
 	glLoadIdentity();									// load identity matrix
 
@@ -313,7 +338,7 @@ void display(void)
 	useShader(&minimal);
 	drawAxes(10);
 
-	switch(whichToonRenderer)
+/*	switch(whichToonRenderer)
 	{
 		case 1:	plainToonShader(&drawToonGeometry); break;
 		case 2:	lineBasedOutline(&drawToonGeometry); break;
@@ -321,7 +346,15 @@ void display(void)
 		case 4: renderWithShader(&drawToonGeometry, &normalshader); break;
 		case 5: renderWithShader(&drawToonGeometry, &depthnormal); break;
 		default: drawToonGeometry(); break;
-	}/**/
+	}*/
+	if(whichToonRenderer > 0 && whichToonRenderer <= MAX_RENDERERS)
+	{
+		renderer[whichToonRenderer-1].render(&drawToonGeometry, renderer[whichToonRenderer-1].preshader);
+	}
+	else
+	{
+		drawToonGeometry();
+	}
 
 	// end RTT
 	glPopAttrib();
@@ -341,10 +374,19 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	// clear frame and z-buffers
 	//glLoadIdentity();									// load identity matrix
 
-	switch(whichToonRenderer)
+	/*switch(whichToonRenderer)
 	{
 		case 5: useShader(&textureSimple); break;
+		case 6: useShader(&depthoutline); break;
 		default: useShader(&minimal); break;
+	}*/
+	if(whichToonRenderer > 0 && whichToonRenderer <= MAX_RENDERERS)
+	{
+		useShader(renderer[whichToonRenderer-1].postshader);
+	}
+	else
+	{
+		useShader(&minimal);
 	}
 	//useShader(&minimal);
 	//useShader(&textureSimple);
@@ -485,6 +527,7 @@ void initialisation()
 	createShader(&normalshader, "depthnormal.vert", "normal.frag");
 	createShader(&discontinuity, "discontinuity.vert", "discontinuity.frag");
 	createShader(&textureSimple, "textureSimple.vert", "textureSimple.frag");
+	createShader(&depthoutline, "textureSimple.vert", "depthoutline.frag");
 
 	createDSTerrain(&terrain, 6);
 	//printDSTerrain(&terrain);

@@ -6,6 +6,8 @@ void createShader(GLshader *s, char *vert, char *frag)
 	char *vs;
 	char *fs;
 
+	int param;
+
 	// check whether arguments exist
 	if(strlen(vert) <= 0 && strlen(frag) <= 0)
 	{
@@ -62,9 +64,62 @@ void createShader(GLshader *s, char *vert, char *frag)
 	// maybe not use it?  maybe have other function to use it?  or maybe use by default?
 	glLinkProgram(s->p);
 	glUseProgram(s->p);
+
+	glGetShaderiv(s->v, GL_COMPILE_STATUS, &param);
+	if(param == GL_FALSE)
+	{
+		printf("Vertex shader failed to compile.\n");
+		printShaderInfoLog(s->v);
+	}
+	glGetShaderiv(s->f, GL_COMPILE_STATUS, &param);
+	if(param == GL_FALSE)
+	{
+		printf("Fragment shader failed to compile.\n");
+		printShaderInfoLog(s->f);
+	}
+	glGetProgramiv(s->p, GL_LINK_STATUS, &param);
+	if(param == GL_FALSE)
+	{
+		printf("Program failed to link.\n");
+		printProgramInfoLog(s->p);
+	}
 }
 
 void useShader(GLshader *s)
 {
 	glUseProgram(s->p);
+}
+
+void printShaderInfoLog(GLuint obj)
+{
+	int infologLength = 0;
+	int charsWritten  = 0;
+	char *infoLog;
+
+	glGetShaderiv(obj, GL_INFO_LOG_LENGTH,&infologLength);
+
+	if (infologLength > 0)
+	{
+	    infoLog = (char *)malloc(infologLength);
+	    glGetShaderInfoLog(obj, infologLength, &charsWritten, infoLog);
+		printf("%s\n",infoLog);
+	    free(infoLog);
+	}
+}
+
+void printProgramInfoLog(GLuint obj)
+{
+	int infologLength = 0;
+	int charsWritten  = 0;
+	char *infoLog;
+
+	glGetProgramiv(obj, GL_INFO_LOG_LENGTH,&infologLength);
+
+	if (infologLength > 0)
+	{
+	    infoLog = (char *)malloc(infologLength);
+	    glGetProgramInfoLog(obj, infologLength, &charsWritten, infoLog);
+		printf("%s\n",infoLog);
+	    free(infoLog);
+	}
 }
