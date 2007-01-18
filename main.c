@@ -16,6 +16,11 @@ GLcamera camera;
 GLshader toon;
 GLshader minimal;
 GLshader black;
+GLshader normalshader;
+GLshader depthshader;
+GLshader depthnormal;
+GLshader discontinuity;
+GLshader textureSimple;
 
 GLuint fbo;
 GLuint depthbuffer;
@@ -34,7 +39,7 @@ int prevMillis;
 int frameCount = 0;
 double idleCount = 0;
 
-int whichToonRenderer = 2;
+int whichToonRenderer = 5;
 
 typedef struct
 {
@@ -199,15 +204,27 @@ void drawClouds(void)
 
 void drawToonGeometry(void)
 {
+	// sky dome
+	glColor3f(114.0/255.0, 181.0/255.0, 245.0/255.0);
+	glutSolidSphere(100, 10, 10);
+
+	// set groud colour
 	glColor3f(1.0f, 0.5f, 0.5f);
 	glutSolidTeapot(1);
 	drawDSTerrain(&terrain);
+
 	drawClouds();
 }
 
 void plainToonShader(void (*geom)(void))
 {
 	useShader(&toon);
+	(*geom)();
+}
+
+void renderWithShader(void (*geom)(void), GLshader *shader)
+{
+	useShader(shader);
 	(*geom)();
 }
 
@@ -289,17 +306,20 @@ void display(void)
 
 	processCamera(&camera);
 
-	useShader(&minimal);
+	/*useShader(&minimal);
 	glColor3f(114.0/255.0, 181.0/255.0, 245.0/255.0);
-	glutSolidSphere(100, 10, 10);
+	glutSolidSphere(100, 10, 10);*/
 
 	useShader(&minimal);
 	drawAxes(10);
 
 	switch(whichToonRenderer)
 	{
-		case 1:	lineBasedOutline(&drawToonGeometry); break;
-		case 2:	plainToonShader(&drawToonGeometry); break;
+		case 1:	plainToonShader(&drawToonGeometry); break;
+		case 2:	lineBasedOutline(&drawToonGeometry); break;
+		case 3: renderWithShader(&drawToonGeometry, &depthshader); break;
+		case 4: renderWithShader(&drawToonGeometry, &normalshader); break;
+		case 5: renderWithShader(&drawToonGeometry, &depthnormal); break;
 		default: drawToonGeometry(); break;
 	}/**/
 
@@ -321,7 +341,13 @@ void display(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	// clear frame and z-buffers
 	//glLoadIdentity();									// load identity matrix
 
-	useShader(&minimal);
+	switch(whichToonRenderer)
+	{
+		case 5: useShader(&textureSimple); break;
+		default: useShader(&minimal); break;
+	}
+	//useShader(&minimal);
+	//useShader(&textureSimple);
 	glColor3f(1.0, 1.0, 1.0);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, img);
@@ -416,6 +442,7 @@ void initRenderToTexture()
 
 	// Now setup a texture to render to
 	glGenTextures(1, &img);
+	printf("Texture #%d\n", img);
 	glBindTexture(GL_TEXTURE_2D, img);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  rttWidth, rttHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -453,6 +480,11 @@ void initialisation()
 	createShader(&toon, "my_toonf2.vert", "my_toonf2.frag");
 	//createShader(&minimal, "minimal.vert", "minimal.frag");
 	createShader(&black, "minimal.vert", "black.frag");
+	createShader(&depthnormal, "depthnormal.vert", "depthnormal.frag");
+	createShader(&depthshader, "depthnormal.vert", "depth.frag");
+	createShader(&normalshader, "depthnormal.vert", "normal.frag");
+	createShader(&discontinuity, "discontinuity.vert", "discontinuity.frag");
+	createShader(&textureSimple, "textureSimple.vert", "textureSimple.frag");
 
 	createDSTerrain(&terrain, 6);
 	//printDSTerrain(&terrain);
