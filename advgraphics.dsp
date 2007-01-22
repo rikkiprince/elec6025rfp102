@@ -109,10 +109,6 @@ SOURCE=.\shader.c
 
 SOURCE=.\textfile.c
 # End Source File
-# Begin Source File
-
-SOURCE=.\textureSimple.frag
-# End Source File
 # End Group
 # Begin Group "Header Files"
 

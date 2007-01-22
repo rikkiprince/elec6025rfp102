@@ -2,6 +2,7 @@ uniform sampler2D tex;
 
 void main()
 {
+	vec3 lightDir = vec3(0.0, -1.0, 0.0);
 	float to = 0.001;
 	vec2 coords = gl_TexCoord[0].st;
 

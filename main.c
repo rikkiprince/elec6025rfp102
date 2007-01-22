@@ -42,7 +42,7 @@ int prevMillis;
 int frameCount = 0;
 double idleCount = 0;
 
-
+char *maintitle = "~rfp102 - Rikki Prince - ELEC6025 Advanced Graphics Project";
 
 
 
@@ -69,6 +69,7 @@ void drawToonGeometry(void);
 void plainToonShader(void (*geom)(void), GLshader *shader);
 void renderWithShader(void (*geom)(void), GLshader *shader);
 void lineBasedOutline(void (*geom)(void), GLshader *shader);
+void stencilBasedOutline(void (*geom)(void), GLshader *shader);
 
 
 typedef struct
@@ -78,8 +79,8 @@ typedef struct
 	GLshader *postshader;
 } Renderer;
 
-#define MAX_RENDERERS	(8)
-int whichToonRenderer = 7;
+#define MAX_RENDERERS	(9)
+int whichToonRenderer = 2;
 
 Renderer renderer[MAX_RENDERERS] = {	{&plainToonShader,	&toon,			&minimal},
 										{&lineBasedOutline,	&minimal,		&minimal},
@@ -89,6 +90,7 @@ Renderer renderer[MAX_RENDERERS] = {	{&plainToonShader,	&toon,			&minimal},
 										{&renderWithShader,	&depthnormal,	&normaloutline},
 										{&renderWithShader,	&depthnormal,	&final},
 										{&renderWithShader,	&depthnormal,	&textureSimple},
+										{&stencilBasedOutline,	&minimal,	&minimal},
 									};
 
 typedef struct
@@ -283,7 +285,8 @@ void renderWithShader(void (*geom)(void), GLshader *shader)
 void lineBasedOutline(void (*geom)(void), GLshader *shader)
 {
 	glColor3f(0.0f, 0.0f, 0.0f);
-	// http://www.codeproject.com/opengl/dsaqua.asp
+	// http://www.codeproject.com/opengl/dsaqua.asp			Why?
+	// http://www.codeproject.com/opengl/Outline_Mode.asp
 	// Push the GL attribute bits so that we don't wreck any settings
 	glPushAttrib( GL_ALL_ATTRIB_BITS );
 	// Enable polygon offsets, and offset filled polygons forward by 2.5
@@ -304,6 +307,40 @@ void lineBasedOutline(void (*geom)(void), GLshader *shader)
 	glColor3f( 1.0f, 1.0f, 1.0f );
 	// Render the object
 	useShader(&toon);
+	(*geom)();
+	// Pop the state changes off the attribute stack
+	// to set things back how they were
+	glPopAttrib();
+}
+
+void stencilBasedOutline(void (*geom)(void), GLshader *shader)
+{
+	// http://www.codeproject.com/opengl/Outline_Mode.asp
+	// Push the GL attribute bits so that we don't wreck any settings
+	glPushAttrib( GL_ALL_ATTRIB_BITS );
+	glEnable( GL_LIGHTING );
+	// Set the clear value for the stencil buffer, then clear it
+	glClearStencil(0);
+	glClear( GL_STENCIL_BUFFER_BIT );
+	glEnable( GL_STENCIL_TEST );
+	// Set the stencil buffer to write a 1 in every time
+	// a pixel is written to the screen
+	glStencilFunc( GL_ALWAYS, 1, 0xFFFF );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+	// Render the object in black
+	glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+	glColor3f( 0.0f, 0.0f, 0.0f );
+	(*geom)();
+	glDisable( GL_LIGHTING );
+	// Set the stencil buffer to only allow writing
+	// to the screen when the value of the
+	// stencil buffer is not 1
+	glStencilFunc( GL_NOTEQUAL, 1, 0xFFFF );
+	glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+	// Draw the object with thick lines
+	glLineWidth( 3.0f );
+	glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+	glColor3f( 1.0f, 1.0f, 1.0f );
 	(*geom)();
 	// Pop the state changes off the attribute stack
 	// to set things back how they were
@@ -492,6 +529,8 @@ void keyboard(unsigned char k, int x, int y)
 					break;
 	}
 
+
+
 	//printPos();
 
 	display();
@@ -607,6 +646,8 @@ void idle(void)
 		prevMillis = millis;
 		idleCount = 0;
 	}
+
+	//glutPostRedisplay();
 }
 
 void reshape(int w, int h)
@@ -653,7 +694,7 @@ void main(int argc, char **argv) {
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);	// double buffering (for screen 4), RGB for nice colours and Z-buffering
 	glutInitWindowSize(500, 500);	// Set window width and height...
 	//glutInitWindowSize(1280, 1024);	// Set window width and height...
-	glutCreateWindow("~rfp102 - Rikki Prince - ELEC6025 Advanced Graphics Project");	// Create window and give it a title
+	glutCreateWindow(maintitle);	// Create window and give it a title
 
 	// Callback setup
 	glutReshapeFunc(reshape);	// handle changing the window size which affects the viewport
